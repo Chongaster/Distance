@@ -1,317 +1,430 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Mesure Pétanque / Palets</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            touch-action: none; /* Prevents double tap zoom */
-        }
-        .video-container {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #000;
-        }
-        #video, #canvas {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            min-width: 100%;
-            min-height: 100%;
-            width: auto;
-            height: auto;
-        }
-        .controls {
-            position: fixed;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            padding: 20px;
-            box-sizing: border-box;
-            background: linear-gradient(to top, rgba(0,0,0,0.8), rgba(0,0,0,0));
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-        }
-        .capture-btn {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            border: 5px solid white;
-            background-color: rgba(255, 255, 255, 0.5);
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        .capture-btn:active {
-            transform: scale(0.9);
-            background-color: white;
-        }
-        .reset-btn {
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            border: none;
-            background-color: rgba(255, 255, 255, 0.8);
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .message-box {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0,0,0,0.7);
-            color: white;
-            padding: 10px 20px;
-            border-radius: 20px;
-            font-size: 16px;
-            z-index: 20;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-            pointer-events: none;
-        }
-        .visible {
-            opacity: 1;
-        }
-        #results {
-            position: fixed;
-            top: 80px;
-            left: 10px;
-            background-color: rgba(0,0,0,0.6);
-            color: white;
-            padding: 10px;
-            border-radius: 8px;
-            font-size: 14px;
-            max-height: calc(100% - 180px);
-            overflow-y: auto;
-        }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Pétanque & Palets — Mesure + Score (mobile)</title>
+<style>
+  :root{
+    --bg:#0b0b0d;--panel:#141419;--panel-2:#1b1b22;--text:#fff;--muted:#9aa0a6;--accent:#4f8cff;--accent-2:#22c55e;--warn:#fbbf24;--danger:#ef4444;
+  }
+  html,body{height:100%;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;margin:0}
+  .page{display:none;min-height:100dvh}
+  .page.active{display:flex}
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px;text-align:center}
+  h1{font-size:28px;margin:6px 0 2px} h2{font-size:22px;margin:0 0 8px}
+  .btn{appearance:none;border:0;border-radius:14px;padding:14px 18px;font-weight:700;font-size:18px;color:#fff;background:var(--panel-2);box-shadow:0 6px 20px rgba(0,0,0,.35);touch-action:manipulation}
+  .btn:active{transform:scale(.98)}
+  .btn.primary{background:var(--accent)} .btn.success{background:var(--accent-2)} .btn.warn{background:var(--warn);color:#161616}
+  .btn.danger{background:var(--danger)} .btn.ghost{background:var(--panel)} .btn.sm{padding:10px 12px;font-size:16px;border-radius:12px}
+  .row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .toolbar{position:fixed;bottom:0;left:0;right:0;display:flex;gap:10px;justify-content:center;align-items:center;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.55));padding:16px 12px 20px}
+  .header{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:linear-gradient(180deg,rgba(0,0,0,.65),rgba(0,0,0,0))}
+  .tag{background:var(--panel);border-radius:999px;padding:6px 10px;color:var(--muted);font-size:13px}
+  .hint{font-size:14px;color:var(--muted)}
+  /* Mesure */
+  .stage{position:relative;flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  canvas{max-width:100%;max-height:100%;touch-action:none;background:#000;border-radius:16px}
+  #results{position:fixed;top:68px;left:12px;right:auto;background:rgba(20,20,26,.78);backdrop-filter:blur(6px);
+           border:1px solid rgba(255,255,255,.06);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.35;max-width:70vw;max-height:46vh;overflow:auto}
+  #msg{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:rgba(20,20,26,.9);border:1px solid rgba(255,255,255,.06);
+       border-radius:12px;padding:10px 14px;font-size:15px;opacity:0;transition:opacity .25s;pointer-events:none}
+  #msg.show{opacity:1}
+  .list-item{padding:4px 2px}
+  .list-item.win{color:#7cf29c;font-weight:800}
+  .pill{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.08);padding:6px 10px;border-radius:999px;font-size:13px}
+  /* Score */
+  .score-wrap{display:grid;grid-template-columns:1fr 1fr;gap:14px;width:min(560px,92vw)}
+  .card{background:var(--panel-2);border:1px solid rgba(255,255,255,.06);border-radius:16px;padding:14px}
+  .team{font-size:14px;color:var(--muted);margin-bottom:6px}
+  .score{font-size:44px;font-weight:800;margin:4px 0 10px}
+  .btn-circle{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900}
+  /* Aide */
+  .help{max-width:680px;margin:0 auto;padding:24px;line-height:1.5;color:#e4e7eb}
+  .help li{margin:8px 0}
+  /* Inputs */
+  input[type=file]{display:none}
+  .file-label{display:inline-flex;align-items:center;gap:10px}
+  .file-label .icon{font-size:20px}
+</style>
 </head>
-<body class="bg-black text-white">
+<body>
 
-    <!-- Conteneur pour la vidéo et le canvas -->
-    <div class="video-container">
-        <video id="video" playsinline autoplay muted></video>
-        <canvas id="canvas"></canvas>
+<!-- ============== ACCUEIL ============== -->
+<section id="home" class="page active center">
+  <div class="tag">Pétanque & Palets — Mobile</div>
+  <h1>🏆 Mesure & Score</h1>
+  <div class="row" style="margin-top:8px">
+    <button class="btn primary" onclick="goto('measure')">📷 Mesurer</button>
+    <button class="btn success" onclick="goto('score')">🎯 Compter les points</button>
+    <button class="btn ghost" onclick="goto('help')">❓ Aide</button>
+  </div>
+</section>
+
+<!-- ============== MESURE ============== -->
+<section id="measure" class="page" style="flex-direction:column">
+  <div class="header">
+    <button class="btn sm ghost" onclick="goto('home')">⬅ Accueil</button>
+    <div class="pill"><span id="tip">Prendre une photo → poser le cochonnet → poser les boules</span></div>
+    <div class="row">
+      <button class="btn sm ghost" id="fsBtn" title="Plein écran">⤢</button>
     </div>
+  </div>
 
-    <!-- Boîte de message pour les instructions -->
-    <div id="messageBox" class="message-box"></div>
+  <div id="msg"></div>
+  <div id="results" style="display:none"></div>
 
-    <!-- Panneau pour afficher les résultats -->
-    <div id="results" class="hidden"></div>
+  <div class="stage">
+    <canvas id="canvas" width="1280" height="720" aria-label="Surface de mesure"></canvas>
+  </div>
 
-    <!-- Boutons de contrôle -->
-    <div id="controls" class="controls">
-        <button id="resetBtn" class="reset-btn hidden">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M21 21v-5h-5"/></svg>
-        </button>
-        <button id="captureBtn" class="capture-btn"></button>
+  <div class="toolbar">
+    <label for="camera" class="btn file-label primary">
+      <span class="icon">📸</span><span>Prendre une photo</span>
+    </label>
+    <input id="camera" type="file" accept="image/*" capture="environment" />
+    <button class="btn ghost sm" id="zoomOut">−</button>
+    <button class="btn ghost sm" id="zoomIn">＋</button>
+    <button class="btn ghost sm" id="fitBtn">Ajuster</button>
+    <button class="btn warn sm" id="resetMeasure">Réinitialiser</button>
+  </div>
+</section>
+
+<!-- ============== SCORE ============== -->
+<section id="score" class="page center">
+  <div class="tag">Compteur</div>
+  <h2>🎯 Score en direct</h2>
+  <div class="score-wrap">
+    <div class="card">
+      <div class="team">Équipe A</div>
+      <div id="scoreA" class="score">0</div>
+      <div class="row">
+        <button class="btn btn-circle primary" onclick="addScore('A',1)">＋</button>
+        <button class="btn btn-circle ghost" onclick="addScore('A',-1)">−</button>
+        <button class="btn sm ghost" onclick="addScore('A',3)">+3</button>
+      </div>
     </div>
+    <div class="card">
+      <div class="team">Équipe B</div>
+      <div id="scoreB" class="score">0</div>
+      <div class="row">
+        <button class="btn btn-circle success" onclick="addScore('B',1)">＋</button>
+        <button class="btn btn-circle ghost" onclick="addScore('B',-1)">−</button>
+        <button class="btn sm ghost" onclick="addScore('B',3)">+3</button>
+      </div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:12px">
+    <button class="btn danger" onclick="resetScores()">Réinitialiser</button>
+    <button class="btn ghost" onclick="goto('home')">⬅ Accueil</button>
+  </div>
+</section>
 
-    <script>
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const context = canvas.getContext('2d');
-        const captureBtn = document.getElementById('captureBtn');
-        const resetBtn = document.getElementById('resetBtn');
-        const controlsDiv = document.getElementById('controls');
-        const messageBox = document.getElementById('messageBox');
-        const resultsDiv = document.getElementById('results');
+<!-- ============== AIDE ============== -->
+<section id="help" class="page">
+  <div class="center" style="width:100%">
+    <div class="tag">Guide rapide</div>
+    <h2>ℹ️ Utilisation</h2>
+    <div class="help card">
+      <ol>
+        <li>Appuie sur <b>Mesurer</b> puis <b>Prendre une photo</b> (ouvre la caméra). Rien n'est sauvegardé sur le téléphone.</li>
+        <li><b>Pose d'abord le cochonnet</b> (tap sur la photo), puis <b>pose chaque boule/palet</b> (autant que tu veux).</li>
+        <li>Les distances s'affichent et la boule la plus proche est mise en évidence 🏆.</li>
+        <li><b>Double-tap</b> sur une boule pour la supprimer. <b>Pinch</b> pour zoomer, <b>glisser</b> pour déplacer l'image. Boutons <b>＋/−/Ajuster</b> en bas.</li>
+        <li>Le <b>compteur de points</b> se trouve dans l'onglet “Compter les points”.</li>
+      </ol>
+    </div>
+    <div class="row">
+      <button class="btn ghost" onclick="goto('home')">⬅ Accueil</button>
+    </div>
+  </div>
+</section>
 
-        let points = []; // Stocke les points cliqués {x, y}
-        let jack = null; // Stocke le point du cochonnet
-        let imageCaptured = false;
+<script>
+/* ========= Navigation ========= */
+function goto(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
 
-        // Fonction pour afficher des messages à l'utilisateur
-        function showMessage(text, duration = 3000) {
-            messageBox.textContent = text;
-            messageBox.classList.add('visible');
-            setTimeout(() => {
-                messageBox.classList.remove('visible');
-            }, duration);
-        }
+/* ========= Score ========= */
+let scA=0, scB=0;
+function addScore(team,delta){
+  if(team==='A'){ scA=Math.max(0, scA+delta); document.getElementById('scoreA').textContent=scA; }
+  else { scB=Math.max(0, scB+delta); document.getElementById('scoreB').textContent=scB; }
+}
+function resetScores(){ scA=0; scB=0; document.getElementById('scoreA').textContent=scA; document.getElementById('scoreB').textContent=scB; }
 
-        // Démarrer la caméra
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'environment', // Caméra arrière
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    }
-                });
-                video.srcObject = stream;
-                video.onloadedmetadata = () => {
-                    showMessage("Visez et appuyez sur le bouton pour capturer");
-                };
-            } catch (err) {
-                console.error("Erreur d'accès à la caméra: ", err);
-                showMessage("Impossible d'accéder à la caméra. Vérifiez les autorisations.");
-                // Fallback for desktop or browsers without environment camera
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                    video.srcObject = stream;
-                    video.onloadedmetadata = () => {
-                       showMessage("Visez et appuyez sur le bouton pour capturer");
-                    };
-                } catch (fallbackErr) {
-                    console.error("Erreur d'accès à la caméra (fallback): ", fallbackErr);
-                    showMessage("Aucune caméra disponible.");
-                }
-            }
-        }
+/* ========= Helpers UI ========= */
+const msg = document.getElementById('msg');
+function toast(t,ms=1600){ msg.textContent=t; msg.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>msg.classList.remove('show'),ms); }
 
-        // Dessiner sur le canvas
-        function draw() {
-            if (!imageCaptured) return;
+/* ========= Mesure & Canvas ========= */
+const fileInput = document.getElementById('camera');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { alpha:false, desynchronized:true });
 
-            // 1. Redessiner l'image de fond
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+let img = new Image();
+let imgLoaded = false;
 
-            // 2. Dessiner le cochonnet
-            if (jack) {
-                context.beginPath();
-                context.arc(jack.x, jack.y, 15, 0, 2 * Math.PI);
-                context.fillStyle = 'rgba(255, 0, 255, 0.8)'; // Magenta pour le cochonnet
-                context.fill();
-                context.strokeStyle = 'white';
-                context.lineWidth = 2;
-                context.stroke();
-            }
+/* Points stockés en coordonnées image (pas écran) */
+let jack = null;          // {x,y}
+let balls = [];           // [{x,y}, ...]
+const BALL_R = 16;        // rayon affichage
 
-            // 3. Dessiner les boules et les lignes
-            let distances = [];
-            if (jack && points.length > 0) {
-                points.forEach((point, index) => {
-                    const dist = Math.sqrt(Math.pow(point.x - jack.x, 2) + Math.pow(point.y - jack.y, 2));
-                    distances.push({ index, dist });
-                });
+/* Transformations (écran <-> image) */
+let scale = 1, offsetX = 0, offsetY = 0;
+let baseFit = { scale:1, offsetX:0, offsetY:0 }; // pour bouton "Ajuster"
+function setTransform(){ ctx.setTransform(scale,0,0,scale,offsetX,offsetY); }
+function screenToImage(px,py){
+  return { x:(px - offsetX)/scale, y:(py - offsetY)/scale };
+}
+function imageToScreen(ix,iy){
+  return { x: ix*scale + offsetX, y: iy*scale + offsetY };
+}
 
-                // Trier pour trouver la plus proche
-                distances.sort((a, b) => a.dist - b.dist);
-                const closestIndex = distances.length > 0 ? distances[0].index : -1;
+/* Dessin principal */
+function draw(){
+  ctx.save();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  setTransform();
+  if(imgLoaded){ ctx.drawImage(img,0,0); }
 
-                points.forEach((point, index) => {
-                    const isClosest = index === closestIndex;
-                    
-                    // Ligne
-                    context.beginPath();
-                    context.moveTo(jack.x, jack.y);
-                    context.lineTo(point.x, point.y);
-                    context.strokeStyle = isClosest ? 'rgba(0, 255, 0, 0.9)' : 'rgba(255, 255, 0, 0.7)'; // Vert pour la plus proche, jaune sinon
-                    context.lineWidth = isClosest ? 4 : 2;
-                    context.stroke();
-                    
-                    // Point (boule)
-                    context.beginPath();
-                    context.arc(point.x, point.y, 15, 0, 2 * Math.PI);
-                    context.fillStyle = isClosest ? 'rgba(0, 255, 0, 0.8)' : 'rgba(255, 255, 0, 0.7)';
-                    context.fill();
-                    context.strokeStyle = 'white';
-                    context.lineWidth = 2;
-                    context.stroke();
+  // Lignes + mesures
+  let distances = [];
+  if(jack){
+    // cochonnet
+    ctx.beginPath(); ctx.arc(jack.x, jack.y, BALL_R, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,215,0,0.92)'; ctx.fill();
+    ctx.lineWidth = 2/scale; ctx.strokeStyle = '#fff'; ctx.stroke();
 
-                    // Texte de la distance
-                    const midX = (jack.x + point.x) / 2;
-                    const midY = (jack.y + point.y) / 2;
-                    context.fillStyle = 'white';
-                    context.font = 'bold 16px Inter';
-                    context.shadowColor = 'black';
-                    context.shadowBlur = 4;
-                    context.fillText(distances.find(d => d.index === index).dist.toFixed(1), midX + 5, midY - 5);
-                    context.shadowBlur = 0;
-                });
-            }
-            updateResults(distances);
-        }
+    balls.forEach((b, i)=>{
+      const d = Math.hypot(b.x - jack.x, b.y - jack.y);
+      distances.push({i, d});
+    });
+    distances.sort((a,b)=>a.d-b.d);
+    const closestIdx = distances[0]?.i;
 
-        function updateResults(distances) {
-            if (distances.length === 0) {
-                resultsDiv.classList.add('hidden');
-                return;
-            }
-            resultsDiv.classList.remove('hidden');
-            let html = '<h3 class="font-bold mb-2">Distances (en pixels)</h3>';
-            distances.forEach((item, rank) => {
-                const isClosest = rank === 0;
-                html += `<div class="${isClosest ? 'text-green-400 font-bold' : ''}">
-                    ${isClosest ? '🏆' : ''} Boule ${item.index + 1}: ${item.dist.toFixed(1)}
-                </div>`;
-            });
-            resultsDiv.innerHTML = html;
-        }
+    balls.forEach((b,i)=>{
+      // ligne
+      ctx.beginPath();
+      ctx.moveTo(jack.x, jack.y); ctx.lineTo(b.x, b.y);
+      ctx.lineWidth = (i===closestIdx? 4:2)/scale;
+      ctx.strokeStyle = (i===closestIdx? 'rgba(34,197,94,0.95)':'rgba(255,235,59,0.85)');
+      ctx.stroke();
+      // boule
+      ctx.beginPath(); ctx.arc(b.x, b.y, BALL_R, 0, Math.PI*2);
+      ctx.fillStyle = (i===closestIdx? 'rgba(34,197,94,0.88)':'rgba(255,235,59,0.75)');
+      ctx.fill(); ctx.lineWidth = 2/scale; ctx.strokeStyle='#fff'; ctx.stroke();
+      // étiquette
+      const mx = (jack.x + b.x)/2, my = (jack.y + b.y)/2;
+      const label = Math.round(Math.hypot(b.x-jack.x, b.y-jack.y)) + ' px';
+      const pad = 6/scale;
+      ctx.font = `${14/scale}px system-ui, Arial`;
+      const w = ctx.measureText(label).width + pad*2;
+      const h = 18/scale;
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.fillRect(mx - w/2, my - h - 6/scale, w, h);
+      ctx.fillStyle = '#fff';
+      ctx.fillText(label, mx - w/2 + pad, my - 6/scale - 4/scale);
+    });
+  }
 
+  ctx.restore();
+  updateList(distances);
+}
 
-        // Événement du bouton de capture
-        captureBtn.addEventListener('click', () => {
-            if (imageCaptured) return; // Empêche de recapturer par-dessus
+/* Panneau distances */
+const results = document.getElementById('results');
+function updateList(distances){
+  if(!jack || balls.length===0){ results.style.display='none'; results.innerHTML=''; return; }
+  results.style.display='block';
+  let html = '<div class="pill" style="margin-bottom:6px">Distances (pixels)</div>';
+  distances.forEach((d,rank)=>{
+    const win = (rank===0);
+    html += `<div class="list-item ${win?'win':''}">${win?'🏆 ':''}Boule ${d.i+1}: ${d.d.toFixed(0)} px</div>`;
+  });
+  results.innerHTML = html;
+}
 
-            // Ajuster la taille du canvas à la taille de la vidéo affichée
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            video.pause();
-            video.classList.add('hidden'); // Cacher la vidéo pour ne voir que le canvas
-            
-            imageCaptured = true;
-            captureBtn.classList.add('hidden');
-            resetBtn.classList.remove('hidden');
-            showMessage("Touchez le cochonnet/maître pour le placer");
-        });
+/* Ajuster image dans le canvas */
+function fitImage(){
+  if(!imgLoaded) return;
+  const cw = canvas.width, ch = canvas.height;
+  const sx = cw / img.width, sy = ch / img.height;
+  baseFit.scale = Math.min(sx, sy);
+  baseFit.offsetX = (cw - img.width*baseFit.scale)/2;
+  baseFit.offsetY = (ch - img.height*baseFit.scale)/2;
+  scale = baseFit.scale; offsetX = baseFit.offsetX; offsetY = baseFit.offsetY;
+  draw();
+}
 
-        // Événement du clic sur le canvas
-        canvas.addEventListener('click', (e) => {
-            if (!imageCaptured) return;
+/* Chargement photo (caméra) */
+fileInput.addEventListener('change', (e)=>{
+  const file = e.target.files && e.target.files[0];
+  if(!file) return;
+  const url = URL.createObjectURL(file);
+  const tmp = new Image();
+  tmp.onload = ()=>{
+    img = tmp; imgLoaded = true;
+    // Adapter canvas à l'image mais garder une taille raisonnable
+    const maxW = Math.min(window.innerWidth*2, 1920);
+    const scaleDown = Math.min(1, maxW / img.width);
+    canvas.width = Math.round(img.width * scaleDown);
+    canvas.height = Math.round(img.height * scaleDown);
+    // Vide mesure
+    jack = null; balls = [];
+    fitImage();
+    toast('Photo chargée. Tape d’abord le cochonnet.');
+  };
+  tmp.src = url;
+});
 
-            // Obtenir les coordonnées du clic par rapport au canvas
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const x = (e.clientX - rect.left) * scaleX;
-            const y = (e.clientY - rect.top) * scaleY;
+/* Interaction — placer points */
+let lastTapTime = 0;
+canvas.addEventListener('pointerdown', onPointerDown);
+canvas.addEventListener('pointermove', onPointerMove);
+canvas.addEventListener('pointerup', onPointerUp);
+canvas.addEventListener('pointercancel', onPointerUp);
+canvas.addEventListener('pointerleave', onPointerUp);
 
-            if (!jack) {
-                jack = { x, y };
-                showMessage("Maintenant, touchez les boules/palets");
-            } else {
-                points.push({ x, y });
-            }
-            draw();
-        });
+let pointers = new Map();
+let dragging = false;
+let lastPos = {x:0,y:0};
+let pinchStart = null;
 
-        // Événement du bouton de réinitialisation
-        resetBtn.addEventListener('click', () => {
-            points = [];
-            jack = null;
-            imageCaptured = false;
+function onPointerDown(e){
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(pointers.size===1){
+    dragging = true; lastPos = {x:e.clientX, y:e.clientY};
+  } else if(pointers.size===2){
+    pinchStart = getPinchData();
+  }
+}
 
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            video.classList.remove('hidden');
-            video.play();
+function onPointerMove(e){
+  if(!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+  if(pointers.size===1 && dragging){
+    const dx = e.clientX - lastPos.x;
+    const dy = e.clientY - lastPos.y;
+    lastPos = {x:e.clientX, y:e.clientY};
+    offsetX += dx; offsetY += dy;
+    draw();
+  } else if(pointers.size===2){
+    const p = getPinchData();
+    if(pinchStart && p){
+      // zoom autour du centre du pinch
+      const factor = p.dist / pinchStart.dist;
+      zoomAt(p.cx, p.cy, factor);
+      pinchStart = p;
+    }
+  }
+}
 
-            captureBtn.classList.remove('hidden');
-            resetBtn.classList.add('hidden');
-            resultsDiv.classList.add('hidden');
-            
-            showMessage("Visez et appuyez sur le bouton pour capturer");
-        });
+function onPointerUp(e){
+  canvas.releasePointerCapture(e.pointerId);
+  const wasTwo = pointers.size===2;
+  pointers.delete(e.pointerId);
 
-        // Démarrer l'application
-        window.addEventListener('load', startCamera);
-    </script>
+  // Tap / Double-tap logique
+  if(!wasTwo && !dragging){ // ignore
+    return;
+  }
+  if(wasTwo){ return; }
+
+  // Si c’était un tap (petit déplacement) et image chargée:
+  // On détecte ça grâce à onClick séparé pour plus de simplicité.
+  dragging = false;
+}
+
+/* Tap pour placer/supprimer */
+canvas.addEventListener('click', (e)=>{
+  if(!imgLoaded) return;
+  // convertir vers coords image
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const {x, y} = screenToImage(sx, sy);
+
+  if(!jack){
+    jack = {x,y}; toast('Cochonnet placé. Pose les boules.');
+  } else {
+    balls.push({x,y});
+  }
+  draw();
+});
+
+/* Double-tap pour supprimer une boule proche */
+canvas.addEventListener('dblclick', (e)=>{
+  if(!imgLoaded || balls.length===0) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = e.clientX - rect.left;
+  const sy = e.clientY - rect.top;
+  const {x,y} = screenToImage(sx,sy);
+
+  const idx = balls.findIndex(b => Math.hypot(b.x-x, b.y-y) < BALL_R*1.5);
+  if(idx>-1){ balls.splice(idx,1); toast('Boule supprimée'); draw(); }
+});
+
+/* Pinch helpers */
+function getPinchData(){
+  const pts = [...pointers.values()];
+  if(pts.length!==2) return null;
+  const [a,b] = pts;
+  const cx = (a.x + b.x)/2;
+  const cy = (a.y + b.y)/2;
+  const dist = Math.hypot(a.x-b.x, a.y-b.y);
+  return {cx, cy, dist};
+}
+function zoomAt(screenX, screenY, factor){
+  // éviter zoom excessif
+  const newScale = clamp(scale * factor, 0.25, 8);
+  factor = newScale / scale;
+
+  // point d'ancrage (coords image du point visé)
+  const before = screenToImage(screenX, screenY);
+  scale = newScale;
+  // recalculer offset pour garder le même point sous le doigt
+  const after = imageToScreen(before.x, before.y);
+  offsetX += (screenX - after.x);
+  offsetY += (screenY - after.y);
+  draw();
+}
+function clamp(v,mi,ma){ return Math.max(mi, Math.min(ma, v)); }
+
+/* Boutons zoom/fit/reset */
+document.getElementById('zoomIn').addEventListener('click', ()=> zoomAt(canvas.width/2, canvas.height/2, 1.2));
+document.getElementById('zoomOut').addEventListener('click', ()=> zoomAt(canvas.width/2, canvas.height/2, 1/1.2));
+document.getElementById('fitBtn').addEventListener('click', ()=>{ scale=baseFit.scale; offsetX=baseFit.offsetX; offsetY=baseFit.offsetY; draw(); });
+
+document.getElementById('resetMeasure').addEventListener('click', ()=>{
+  jack = null; balls = []; draw();
+  toast('Mesure réinitialisée');
+});
+
+/* Plein écran */
+const fsBtn = document.getElementById('fsBtn');
+fsBtn.addEventListener('click', ()=>{
+  const el = document.documentElement;
+  if(!document.fullscreenElement){
+    if(el.requestFullscreen) el.requestFullscreen();
+  } else {
+    if(document.exitFullscreen) document.exitFullscreen();
+  }
+});
+
+/* Ajuste le canvas à l’écran pour plus de confort visuel */
+function resizeCanvasToViewport(){
+  // garde la résolution, mais adapte l'affichage par CSS (le canvas a déjà width/height en px logiques)
+  // Ici on peut recalculer un fit si image chargée.
+  if(imgLoaded){ fitImage(); }
+}
+window.addEventListener('resize', resizeCanvasToViewport);
+
+/* Page par défaut */
+goto('home');
+</script>
 </body>
 </html>
